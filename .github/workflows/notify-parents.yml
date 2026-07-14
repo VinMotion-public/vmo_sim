@@ -1,0 +1,86 @@
+name: Notify parent repos
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  trigger-parent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout tagged repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if tag is stable
+        id: tag_check
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "Tag detected: $TAG"
+
+          if [[ "$TAG" =~ (rc|alpha|beta) ]]; then
+            echo "This is a pre-release tag. Skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Stable tag confirmed"
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Check if this is the latest stable tag
+        if: steps.tag_check.outputs.should_run == 'true'
+        id: latest_check
+        shell: bash
+        run: |
+          git fetch --tags --force
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+
+          LATEST_TAG=$(git tag --list \
+            | grep -Ev '(rc|alpha|beta)' \
+            | sort -V \
+            | tail -n 1)
+
+          echo "Current tag: $CURRENT_TAG"
+          echo "Latest stable tag: $LATEST_TAG"
+
+          if [[ "$CURRENT_TAG" != "$LATEST_TAG" ]]; then
+            echo "Not the latest stable tag. Skipping."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "This is the latest stable tag"
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger parent workflow
+        if: steps.latest_check.outputs.should_run == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PARENT_REPO_TOKEN }}
+          OWNER: VinMotion-public
+          PARENT_REPO: vmo_packages
+          SUBMODULE_PATH: robots
+          SUBMODULE_SHA: ${{ github.sha }}
+          SUBMODULE_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          curl --fail --show-error -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            "https://api.github.com/repos/${OWNER}/${PARENT_REPO}/actions/workflows/auto-update-submodules.yml/dispatches" \
+            -d @- <<EOF
+          {
+            "ref": "main",
+            "inputs": {
+              "submodule_path": "${SUBMODULE_PATH}",
+              "submodule_sha": "${SUBMODULE_SHA}",
+              "submodule_repo": "${SUBMODULE_REPO}",
+              "tag_name": "${TAG_NAME}"
+            }
+          }
+          EOF
