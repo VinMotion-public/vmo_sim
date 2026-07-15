@@ -1,0 +1,30 @@
+domain_id: 1  # Domain id
+interface: "lo" # Interface 
+
+use_joystick: 0 # Simulate Unitree WirelessController using a gamepad
+joystick_type: "xbox" # support "xbox" and "switch" gamepad layout
+joystick_device: "/dev/input/js0" # Device path
+joystick_bits: 16 # Some game controllers may only have 8-bit accuracy
+
+print_scene_information: 1 # Print link, joint and sensors information of robot
+
+enable_elastic_band: 0 # Virtual spring band, used for lifting h1
+
+# Camera Configuration (only used when built with USE_ROS2=ON)
+# High Resolutions (viz)
+enable_high_res_torso_zed: 0       # 1920x1200
+enable_high_res_head_realsense: 0  # 1280x720
+
+# Down Scaled Resolutions (RL)
+enable_down_scaled_torso_zed: 1      # 64x40
+enable_down_scaled_head_realsense: 0 # 64x36
+
+# Realistic Depth Noise Configuration
+depth_noise:
+  enable: 0
+  axial_a: 0.01          # Distance-squared noise (m)
+  axial_b: 0.00          # Distance linear noise
+  axial_c: 0.001         # Constant base noise
+  dropout_prob_edge: 0.02 # Probability of dropout at sharp depth edges
+  edge_threshold: 0.015   # Depth jump threshold (m) to trigger edge dropout
+  dropout_prob_global: 0.0025 # Random hole probability
